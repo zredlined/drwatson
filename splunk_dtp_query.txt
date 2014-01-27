@@ -1,0 +1,27 @@
+sourcetype="Watson" watson.microsoft.com 
+| regex src_ip="^\d+.\d+.\d+" 
+| eval comment="<cs_uri_path> is the field that Splunk extracts your http://watson.microsoft.com/StageOne URL to."
+| eval comment2="It's pretty ridiculous that this is the only way to comment inside Splunk queries"
+| rex field=cs_uri_path "/(?<bus>\w{3})_VID_(?<vid>\w{4})_PID_(?<pid>\w{4})"
+| rex field=cs_uri_path "/(?<bus>\w{3})_VEN_(?<ven>\w{4})_DEV_(?<dev>\w{4})"
+| eval vid=if(vid!="",vid,ven)
+| eval pid=if(pid!="",vid+""+pid,dev)
+| eval PC_Manufacturer=urldecode(SM)
+| eval PC_Model=urldecode(SPN)
+| rex field=OS "(?<os_version>\d\.\d+)"
+| rex field=OS "(?<os_version_detailed>\d\.\d+\.\d+)"
+| eval BV=urldecode(BV)
+| rename BV as "BIOS Version"
+| rename MID as "Machine ID"
+| where isnotnull(os_version) AND isnotnull(bus)
+| lookup windowsVersion os_version OUTPUT os_description
+| lookup manufId vid OUTPUT vid_name
+| lookup productId pid OUTPUT pid_name
+| eval pid_name = vid_name+" "+pid_name
+| rename vid_name as "Device_Manufacturer" 
+| dedup "Machine ID"
+| search pid_name !="*mouse*"
+| search pid_name !="*keyboard*"
+| search pid_name !="*bluetooth*"
+| search pid_name !="*controller*" 
+| table _time, src_ip, bus, vid, Device_Manufacturer, pid, pid_name, os_version_detailed, os_description, PC_Manufacturer, PC_Model, "BIOS Version", "Machine ID" 
